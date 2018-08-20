@@ -4,20 +4,38 @@ import (
 	"fmt"
 
 	"github.com/gdamore/tcell"
+	"github.com/rivo/tview"
 	"github.com/senorprogrammer/wtf/wtf"
 )
 
+const HelpText = `
+ Keyboard commands for Jira:
+
+   /: Show/hide this help window
+   j: Select the next item in the list
+   k: Select the previous item in the list
+
+   arrow down: Select the next item in the list
+   arrow up:   Select the previous item in the list
+
+   return: Open the selected issue in a browser
+`
+
 type Widget struct {
+	wtf.HelpfulWidget
 	wtf.TextWidget
 
 	result   *SearchResult
 	selected int
 }
 
-func NewWidget() *Widget {
+func NewWidget(app *tview.Application, pages *tview.Pages) *Widget {
 	widget := Widget{
-		TextWidget: wtf.NewTextWidget(" Jira ", "jira", true),
+		HelpfulWidget: wtf.NewHelpfulWidget(app, pages, HelpText),
+		TextWidget:    wtf.NewTextWidget("Jira", "jira", true),
 	}
+
+	widget.HelpfulWidget.SetView(widget.View)
 	widget.unselect()
 
 	widget.View.SetInputCapture(widget.keyboardIntercept)
@@ -54,13 +72,10 @@ func (widget *Widget) display() {
 		return
 	}
 	widget.View.SetWrap(false)
-	widget.View.SetTitle(
-		fmt.Sprintf(
-			"%s- [green]%s[white] ",
-			widget.Name,
-			wtf.Config.UString("wtf.mods.jira.project"),
-		),
-	)
+
+	str := fmt.Sprintf("%s- [green]%s[white]", widget.Name, wtf.Config.UString("wtf.mods.jira.project"))
+
+	widget.View.SetTitle(widget.ContextualTitle(str))
 	widget.View.SetText(fmt.Sprintf("%s", widget.contentFrom(widget.result)))
 }
 
@@ -115,10 +130,7 @@ func (widget *Widget) contentFrom(searchResult *SearchResult) string {
 
 func (widget *Widget) rowColor(idx int) string {
 	if widget.View.HasFocus() && (idx == widget.selected) {
-		foreColor := wtf.Config.UString("wtf.colors.highlight.fore", "black")
-		backColor := wtf.Config.UString("wtf.colors.highlight.back", "orange")
-
-		return fmt.Sprintf("%s:%s", foreColor, backColor)
+		return wtf.DefaultFocussedRowColor()
 	}
 	return wtf.RowColor("jira", idx)
 }
@@ -156,6 +168,8 @@ func getProjects() []string {
 
 func (widget *Widget) keyboardIntercept(event *tcell.EventKey) *tcell.EventKey {
 	switch string(event.Rune()) {
+	case "/":
+		widget.ShowHelp()
 	case "j":
 		// Select the next item down
 		widget.next()

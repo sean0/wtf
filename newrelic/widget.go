@@ -13,7 +13,7 @@ type Widget struct {
 
 func NewWidget() *Widget {
 	widget := Widget{
-		TextWidget: wtf.NewTextWidget(" New Relic ", "newrelic", false),
+		TextWidget: wtf.NewTextWidget("New Relic", "newrelic", false),
 	}
 
 	return &widget
@@ -31,7 +31,7 @@ func (widget *Widget) Refresh() {
 	}
 
 	widget.UpdateRefreshedAt()
-	widget.View.SetTitle(fmt.Sprintf("%s- [green]%s[white]", widget.Name, appName))
+	widget.View.SetTitle(widget.ContextualTitle(fmt.Sprintf("%s - [green]%s[white]", widget.Name, appName)))
 	widget.View.Clear()
 
 	var content string
@@ -72,7 +72,7 @@ func (widget *Widget) contentFrom(deploys []nr.ApplicationDeployment) string {
 				" [green]%s[%s] %s %-.16s[white]\n",
 				deploy.Revision[0:revLen],
 				lineColor,
-				deploy.Timestamp.Format("Jan 02, 15:04 MST"),
+				deploy.Timestamp.Format("Jan 02 15:04 MST"),
 				wtf.NameFromEmail(deploy.User),
 			)
 

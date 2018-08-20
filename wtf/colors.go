@@ -1,6 +1,7 @@
 package wtf
 
 import (
+	"strings"
 	"regexp"
 	"strconv"
 
@@ -411,7 +412,7 @@ var colors = map[string]tcell.Color{
 
 func ASCIItoTviewColors(text string) string {
 	boldRegExp := regexp.MustCompile(`\033\[1m`)
-	fgColorRegExp := regexp.MustCompile(`\033\[38;5;(?P<color>\d+)m`)
+	fgColorRegExp := regexp.MustCompile(`\033\[38;5;(?P<color>\d+);*\d*m`)
 	resColorRegExp := regexp.MustCompile(`\033\[0m`)
 
 	return resColorRegExp.ReplaceAllString(
@@ -420,18 +421,19 @@ func ASCIItoTviewColors(text string) string {
 				text, replaceWithHexColorString), `[::b]`), `[-]`)
 }
 
-func ColorFor(label string) tcell.Color {
-	if _, ok := colors[label]; ok {
-		return colors[label]
-	} else {
-		return tcell.ColorGreen
-	}
-}
-
 /* -------------------- Unexported Functions -------------------- */
 
+func colorFor(label string) tcell.Color {
+	if _, ok := colors[label]; ok {
+		return colors[label]
+	}
+
+	return tcell.ColorGreen
+}
+
 func replaceWithHexColorString(substring string) string {
-	colorID, err := strconv.Atoi(substring[7 : len(substring)-1])
+	colorID, err := strconv.Atoi(strings.Trim(
+		strings.Split(substring, ";")[2], "m"))
 	if err != nil {
 		return substring
 	}

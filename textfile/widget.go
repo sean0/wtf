@@ -1,9 +1,14 @@
 package textfile
 
 import (
-	"fmt"
+	"bytes"
 	"io/ioutil"
+	"os"
+	"path/filepath"
 
+	"github.com/alecthomas/chroma/formatters"
+	"github.com/alecthomas/chroma/lexers"
+	"github.com/alecthomas/chroma/styles"
 	"github.com/gdamore/tcell"
 	"github.com/rivo/tview"
 	"github.com/senorprogrammer/wtf/wtf"
@@ -17,25 +22,24 @@ const HelpText = `
 `
 
 type Widget struct {
+	wtf.HelpfulWidget
 	wtf.TextWidget
 
-	app      *tview.Application
 	filePath string
-	pages    *tview.Pages
 }
 
 func NewWidget(app *tview.Application, pages *tview.Pages) *Widget {
 	widget := Widget{
-		TextWidget: wtf.NewTextWidget(" Text File ", "textfile", true),
+		HelpfulWidget: wtf.NewHelpfulWidget(app, pages, HelpText),
+		TextWidget:    wtf.NewTextWidget("TextFile", "textfile", true),
 
-		app:      app,
 		filePath: wtf.Config.UString("wtf.mods.textfile.filePath"),
-		pages:    pages,
 	}
+
+	widget.HelpfulWidget.SetView(widget.View)
 
 	widget.View.SetWrap(true)
 	widget.View.SetWordWrap(true)
-
 	widget.View.SetInputCapture(widget.keyboardIntercept)
 
 	return &widget
@@ -45,28 +49,69 @@ func NewWidget(app *tview.Application, pages *tview.Pages) *Widget {
 
 func (widget *Widget) Refresh() {
 	widget.UpdateRefreshedAt()
-	widget.View.SetTitle(fmt.Sprintf("%s %s", widget.Name, widget.filePath))
+	widget.View.SetTitle(widget.ContextualTitle(widget.fileName()))
 
-	filePath, _ := wtf.ExpandHomeDir(widget.filePath)
-
-	fileData, err := ioutil.ReadFile(filePath)
-	if err != nil {
-		fileData = []byte{}
-	}
-
-	if err != nil {
-		widget.View.SetText(err.Error())
+	var text string
+	if wtf.Config.UBool("wtf.mods.textfile.format", false) {
+		text = widget.formattedText()
 	} else {
-		widget.View.SetText(string(fileData))
+		text = widget.plainText()
 	}
+
+	widget.View.SetText(text)
 }
 
 /* -------------------- Unexported Functions -------------------- */
 
+func (widget *Widget) fileName() string {
+	return filepath.Base(widget.filePath)
+}
+
+func (widget *Widget) formattedText() string {
+	filePath, _ := wtf.ExpandHomeDir(widget.filePath)
+
+	file, err := os.Open(filePath)
+	if err != nil {
+		return err.Error()
+	}
+
+	lexer := lexers.Match(filePath)
+	if lexer == nil {
+		lexer = lexers.Fallback
+	}
+
+	style := styles.Get(wtf.Config.UString("wtf.mods.textfile.formatStyle", "vim"))
+	if style == nil {
+		style = styles.Fallback
+	}
+	formatter := formatters.Get("terminal256")
+	if formatter == nil {
+		formatter = formatters.Fallback
+	}
+
+	contents, _ := ioutil.ReadAll(file)
+	iterator, _ := lexer.Tokenise(nil, string(contents))
+
+	var buf bytes.Buffer
+	formatter.Format(&buf, style, iterator)
+
+	return tview.TranslateANSI(buf.String())
+}
+
+func (widget *Widget) plainText() string {
+	filePath, _ := wtf.ExpandHomeDir(widget.filePath)
+
+	text, err := ioutil.ReadFile(filePath) // just pass the file name
+	if err != nil {
+		return err.Error()
+	}
+	return string(text)
+}
+
 func (widget *Widget) keyboardIntercept(event *tcell.EventKey) *tcell.EventKey {
 	switch string(event.Rune()) {
 	case "/":
-		widget.showHelp()
+		widget.ShowHelp()
 		return nil
 	case "o":
 		wtf.OpenFile(widget.filePath)
@@ -74,16 +119,4 @@ func (widget *Widget) keyboardIntercept(event *tcell.EventKey) *tcell.EventKey {
 	}
 
 	return event
-}
-
-func (widget *Widget) showHelp() {
-	closeFunc := func() {
-		widget.pages.RemovePage("help")
-		widget.app.SetFocus(widget.View)
-	}
-
-	modal := wtf.NewBillboardModal(HelpText, closeFunc)
-
-	widget.pages.AddPage("help", modal, false, true)
-	widget.app.SetFocus(modal)
 }
