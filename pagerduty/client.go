@@ -14,7 +14,7 @@ type PolicyLevel struct {
 }
 
 type RestructuredEscalationPolicy struct {
-	Levels map[string]PolicyLevel
+	Levels map[int]PolicyLevel
 }
 
 func Fetch() (string, error) {
@@ -43,7 +43,7 @@ func RestructureEscalationPolicies(onCallsList []pagerduty.OnCall) map[string]Re
 	policiesMap := make(map[string]RestructuredEscalationPolicy)
 	var rep *RestructuredEscalationPolicy
 	for _, onCall := range onCallsList {
-		level := fmt.Sprint(onCall.EscalationLevel)
+		level := int(onCall.EscalationLevel)
 		var escPolName = onCall.EscalationPolicy.Summary
 		var userName = onCall.User.Summary
 
@@ -56,7 +56,7 @@ func RestructureEscalationPolicies(onCallsList []pagerduty.OnCall) map[string]Re
 				policiesMap[escPolName].Levels[level] = polLevel
 			}
 		} else {
-			rep = &RestructuredEscalationPolicy{Levels: make(map[string]PolicyLevel)}
+			rep = &RestructuredEscalationPolicy{Levels: make(map[int]PolicyLevel)}
 			if polLevel, ok := rep.Levels[level]; ok {
 				polLevel.Users = append(polLevel.Users, userName)
 				rep.Levels[level] = polLevel
@@ -72,9 +72,9 @@ func RestructureEscalationPolicies(onCallsList []pagerduty.OnCall) map[string]Re
 func FormatOutput(repMap map[string]RestructuredEscalationPolicy) string {
 	var formattedOutput string
 	for policyName, rep := range repMap {
-		formattedOutput += fmt.Sprintf("[blue]Policy: %s[white]\n", policyName)
-		for levelNumber, level := range rep.Levels {
-			formattedOutput += fmt.Sprintf("[green]Level: %s - %s[white]\n", levelNumber, strings.Join(level.Users, ", "))
+		formattedOutput += fmt.Sprintf("[green]%s[white]\n", policyName)
+		for level := 1; level < len(rep.Levels)+1; level++ {
+			formattedOutput += fmt.Sprintf("Level: %d - %s\n", level, strings.Join(rep.Levels[level].Users, ", "))
 		}
 		formattedOutput += fmt.Sprintf("\n")
 	}
