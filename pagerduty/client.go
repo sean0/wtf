@@ -5,6 +5,8 @@ import (
 	"github.com/PagerDuty/go-pagerduty"
 	"os"
 	"strings"
+
+	"github.com/senorprogrammer/wtf/wtf"
 )
 
 type PolicyLevel struct {
@@ -16,7 +18,7 @@ type RestructuredEscalationPolicy struct {
 }
 
 func Fetch() (string, error) {
-	var apikey = os.Getenv("WTF_PD_API_KEY")
+	var apikey = wtf.Config.UString("wtf.mods.pagerduty.apiKey", os.Getenv("WTF_PD_API_KEY"))
 	if onCallsResponse, err := pagerDutyOnCallRequest(apikey); err != nil {
 		return "", err
 	} else {
@@ -27,6 +29,8 @@ func Fetch() (string, error) {
 
 func pagerDutyOnCallRequest(apiKey string) (*pagerduty.ListOnCallsResponse, error) {
 	var opts pagerduty.ListOnCallOptions
+	opts.UserIDs = wtf.ToStrs(wtf.Config.UList("wtf.mods.pagerduty.userIDs"))
+	opts.EscalationPolicyIDs = wtf.ToStrs(wtf.Config.UList("wtf.mods.pagerduty.escalationPolicyIDs"))
 	client := pagerduty.NewClient(apiKey)
 	if onCallList, err := client.ListOnCalls(opts); err != nil {
 		return nil, err
